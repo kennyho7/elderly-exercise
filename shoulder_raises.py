@@ -1,7 +1,7 @@
 import cv2
 import mediapipe as mp
 import math
-import time
+
 
 
 # Load the video capture
