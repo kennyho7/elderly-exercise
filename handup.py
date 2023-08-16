@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import pygame
 import math
+import numpy as np
 
 # Initialize MediaPipe pose module
 mp_pose = mp.solutions.pose
@@ -17,7 +18,7 @@ sound_file = 'count.mp3'
 sound = pygame.mixer.Sound(sound_file)
 
 # Load the video capture
-cap = cv2.VideoCapture(0)  # Use 0 for webcam, or provide the path to a video file
+cap = cv2.VideoCapture(0)
 cap.set(3, 1280)
 cap.set(4, 720)
 
@@ -28,6 +29,11 @@ with mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5, min_tra
 
     shoulder_width = 0  # Initialize shoulder width (in pixels)
     distance_text = "Distance: N/A"  # Default distance text
+
+    # Initialize smoothing window size and buffer
+    smoothing_window_size = 5
+    left_wrist_buffer = []
+    right_wrist_buffer = []
 
     while cap.isOpened():
         success, image = cap.read()
@@ -48,6 +54,19 @@ with mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5, min_tra
             # Get the y-coordinate of the left and right wrists
             left_wrist_y = landmarks[mp_pose.PoseLandmark.LEFT_WRIST].y
             right_wrist_y = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST].y
+
+            # Add y-coordinates to the buffer
+            left_wrist_buffer.append(left_wrist_y)
+            right_wrist_buffer.append(right_wrist_y)
+
+            # Maintain buffer size
+            if len(left_wrist_buffer) > smoothing_window_size:
+                left_wrist_buffer.pop(0)
+                right_wrist_buffer.pop(0)
+
+            # Calculate the smoothed vertical distances
+            left_wrist_smoothed = np.mean(left_wrist_buffer)
+            right_wrist_smoothed = np.mean(right_wrist_buffer)
 
             # Calculate the vertical distance from the wrists to the top of the image
             image_height, image_width, _ = image.shape
@@ -77,8 +96,12 @@ with mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5, min_tra
             distance_text = f"Distance: {distance_to_user:.2f} meters"
 
             # Add visual feedback (green checkmark) if the distance is between 7 and 9.5 meters
-            if 7 <= distance_to_user <= 9.5:
-                cv2.putText(image, "✓", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+            if 9 <= distance_to_user <= 13:
+                save_distance_text = "Save Distance"
+                save_distance_position = (
+                    image.shape[1] - 30 * len(save_distance_text) - 50, 100)  # Adjust position for the right corner
+                cv2.putText(image, save_distance_text, save_distance_position, cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0),
+                            3)
 
             # Draw the pose landmarks on the image
             mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,

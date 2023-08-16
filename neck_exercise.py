@@ -3,9 +3,8 @@ import mediapipe as mp
 import math
 
 
-
 # Load the video capture
-cap = cv2.VideoCapture(0)  # Use 0 for webcam, or provide the path to a video file
+cap = cv2.VideoCapture(0)
 cap.set(3, 1280)
 cap.set(4, 720)
 
@@ -19,6 +18,8 @@ with mp_pose.Pose(min_detection_confidence=0.2, min_tracking_confidence=0.5) as 
     neck_stretch_count = 0
     cooldown_time = 5  # Cooldown period in seconds
     last_stretch_time = 0
+
+    initial_neck_angle = None  # Initialize initial_neck_angle
 
     while True:
         # Capture a video frame from the webcam
@@ -54,30 +55,35 @@ with mp_pose.Pose(min_detection_confidence=0.2, min_tracking_confidence=0.5) as 
             neck_angle = math.degrees(math.atan2(nose_x - right_shoulder_x, nose_y - right_shoulder_y))
 
             if not is_calibrated:
-                initial_neck_angle = neck_angle
+                if initial_neck_angle is None:
+                    initial_neck_angle = neck_angle  # Set initial_neck_angle once
+                # Calibration done, calculate the absolute neck stretch angle relative to the initial_neck_angle
+                neck_stretch = abs(neck_angle - initial_neck_angle)
                 is_calibrated = True
+            else:
+                neck_stretch = abs(neck_angle - initial_neck_angle)
 
-            # Calculate the absolute neck stretch angle relative to the initial_neck_angle
-            neck_stretch = abs(neck_angle - initial_neck_angle)
-
-            # Draw the neck angle on the image
+        # Draw the neck angle on the image
+        if neck_stretch is not None:
             cv2.putText(image_bgr, f'Neck Stretch: {neck_stretch:.2f} degrees', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        else:
+            cv2.putText(image_bgr, 'Calibrating...', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-            # Show direction based on the neck stretch angle
-            direction = None
-            if 12 <= neck_stretch <= 15:
+        # Show direction based on the neck stretch angle
+        direction = None
+        if neck_stretch is not None:
+            if 3 <= neck_stretch <= 6:
                 direction = 'Up'
-            elif 2 <= neck_stretch <= 4:
+            elif 7 <= neck_stretch <= 13:
                 direction = 'Down'
-            elif 0 <= neck_stretch <= 1:
+            elif 8 <= neck_stretch <= 9:
                 direction = 'Left'
-            elif 30 <= neck_stretch <= 33:
+            elif 15 <= neck_stretch <= 19:
                 direction = 'Right'
 
-            # Draw the direction on the image
-            if direction:
-                cv2.putText(image_bgr, f'Direction: {direction}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255),
-                            2)
+        # Draw the direction on the image
+        if direction:
+            cv2.putText(image_bgr, f'Direction: {direction}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
 
         # Draw the pose landmarks on the image
         if results.pose_landmarks:
